@@ -36,7 +36,7 @@ THREE.MaterialLoader.prototype = {
 
 		var material = new THREE[ json.type ];
 
-		if ( json.color !== undefined ) material.color.setHex( json.color );
+		if ( json.name !== undefined ) material.name = json.name
 		if ( json.ambient !== undefined ) material.ambient.setHex( json.ambient );
 		if ( json.emissive !== undefined ) material.emissive.setHex( json.emissive );
 		if ( json.specular !== undefined ) material.specular.setHex( json.specular );
