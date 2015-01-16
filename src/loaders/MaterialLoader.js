@@ -34,27 +34,44 @@ THREE.MaterialLoader.prototype = {
 
 	parse: function ( json ) {
 
-		function create_texture( where, name, sourceFile, repeat, offset, wrap, anisotropy ) {
-
-
+		function loadTextures( where, attr, sourceFiles, repeat, offset, wrap, anisotropy, mapping, filter, format, type, name ) {
+			// this function is from Loader.js,  @author alteredq / http://alteredqualia.com/
 			function error(e){
-				console.warn("Couldn't load texture")
+				console.warn("Couldn't load texture");
 			}
-
-			var fullPath =  sourceFile;
 
 			var texture;
 
-			var loader = THREE.Loader.Handlers.get( fullPath );
+			if ( sourceFiles instanceof Array ) {
 
-			if ( loader !== null ) {
+				var loader = THREE.Loader.Handlers.get( sourceFiles[ 0 ] );
 
-				texture = loader.load( fullPath );
+				if ( loader !== null ) {
+
+					texture = loader.load( sourceFiles );
+
+					if ( mapping !== undefined )
+						texture.mapping = mapping;
+
+				} else {
+
+					texture = THREE.ImageUtils.loadTextureCube( sourceFiles, mapping,undefined, error );
+
+				}
 
 			} else {
 
-				texture = THREE.ImageUtils.loadTexture( fullPath , THREE.UVMapping , undefined, error );
+				var loader = THREE.Loader.Handlers.get( sourceFiles );
 
+				if ( loader !== null ) {
+
+					texture = loader.load( sourceFiles  );
+
+				} else {
+
+					texture = THREE.ImageUtils.loadTexture( sourceFiles, mapping, undefined, error );
+
+				}
 			}
 
 
@@ -90,8 +107,33 @@ THREE.MaterialLoader.prototype = {
 				texture.anisotropy = anisotropy;
 
 			}
+			if ( filter ) {
 
-			where[ name ] = texture;
+				texture.minFilter = filter[0];
+				texture.magFilter = filter[2];
+
+			}
+			if ( format ) {
+
+				texture.format = format;
+
+			}
+			if ( type ) {
+
+				texture.type = type;
+
+			}
+			if ( name ) {
+
+				texture.name = name;
+
+			}
+
+			if( attr instanceof Array){
+				where[ attr[0] ] = texture;
+			}else {
+				where[ attr ] = texture;
+			}
 
 		}
 
@@ -106,6 +148,35 @@ THREE.MaterialLoader.prototype = {
 
 		}
 
+		//search for textures
+		var textures = {};
+		var filesLoaded = [];
+		var mapping,wrap,repeat,offset,anisotropy,filter,format, type, name;
+
+		for( var attr in json){
+
+			if ( attr === "envMap" || attr === "map" || attr === "lightMap" || attr === "bumpMap" || attr === "normalMap" || attr === "alphaMap" ) {
+
+					sourceFile = json[attr];
+
+					if(filesLoaded.indexOf(sourceFile) !== -1)
+						continue;
+
+					mapping = json[attr +"Mapping"];
+					wrap = json[attr +"Wrap"];
+					repeat = json[attr +"Repeat"];
+					offset = json[attr +"Offset"];
+					anisotropy = json[attr +"Anisotropy"];
+					filter = json[attr +"Filter"];
+					format = json[attr +"Format"];
+					type = json[attr +"Typ"];
+					name = json[attr +"Name"];
+
+					loadTextures(textures, sourceFile, sourceFile, repeat, offset, wrap, anisotropy, mapping, filter, format, type, name );
+					filesLoaded.push(sourceFile);
+			}
+		}
+
 		if ( json.type !== undefined ) 		var material = new THREE[ json.type ];
 		if ( json.name !== undefined ) material.name = json.name;
 		if ( json.ambient !== undefined ) material.ambient.setHex( json.ambient );
@@ -117,49 +188,22 @@ THREE.MaterialLoader.prototype = {
 		if ( json.vertexShader !== undefined ) material.vertexShader = json.vertexShader;
 		if ( json.fragmentShader !== undefined ) material.fragmentShader = json.fragmentShader;
 		if ( json.vertexColors !== undefined ) material.vertexColors = json.vertexColors;
-		if ( json.shading !== undefined ) material.shading = json.shading;
+		if ( json.shading !== undefined ) material.shading =  THREE[json.shading];
 		if ( json.blending !== undefined ) material.blending = json.blending;
 		if ( json.side !== undefined ) material.side = json.side;
 		if ( json.opacity !== undefined ) material.opacity = json.opacity;
 		if ( json.transparent !== undefined ) material.transparent = json.transparent;
 		if ( json.wireframe !== undefined ) material.wireframe = json.wireframe;
 		if ( json.metal !== undefined ) material.metal = json.metal;
+		if ( json.combine !== undefined ) material.combine =  THREE[json.combine];
 
-		// textures
-		// this part is from Loader.js,  @author alteredq / http://alteredqualia.com/
-		if ( json.map  ) {
-
-			create_texture( material, 'map', json.map, json.mapRepeat, json.mapOffset, json.mapWrap, json.mapAnisotropy );
-
-		}
-
-		if ( json.lightMap  ) {
-
-			create_texture( material, 'lightMap', json.lightMap, json.lightMapRepeat, json.lightMapOffset, json.lightMapWrap, json.lightMapAnisotropy );
-
-		}
-
-		if ( json.bumpMap  ) {
-			create_texture( material, 'bumpMap', json.bumpMap, json.bumpMapRepeat, json.bumpMapOffset, json.bumpMapWrap, json.bumpMapAnisotropy );
-		}
-
-		if ( json.normalMap  ) {
-
-			create_texture( material, 'normalMap', json.normalMap, json.normalMapRepeat, json.normalMapOffset, json.normalMapWrap, json.normalMapAnisotropy );
-
-		}
-
-		if ( json.specularMap  ) {
-
-			create_texture( material, 'specularMap', json.specularMap, json.specularMapRepeat, json.specularMapOffset, json.specularMapWrap, json.specularMapAnisotropy );
-
-		}
-
-		if ( json.alphaMap ) {
-
-			create_texture( material, 'alphaMap', json.alphaMap, json.alphaMapRepeat, json.alphaMapOffset, json.alphaMapWrap, json.alphaMapAnisotropy );
-
-		}
+		if ( json.map !== undefined && textures[json.map] !== undefined  ) material.map = textures[json.map] ;
+		if ( json.lightMap !== undefined && textures[json.lightMap] !== undefined  ) material.lightMap = textures[json.lightMap] ;
+		if ( json.envMap !== undefined && textures[json.envMap[0]] !== undefined  ) material.envMap = textures[json.envMap[0]] ;
+		if ( json.bumpMap !== undefined && textures[json.bumpMap] !== undefined  ) material.bumpMap = textures[json.bumpMap]
+		if ( json.normalMap !== undefined && textures[json.normalMap] !== undefined  )  material.normalMap = textures[json.normalMap] ;
+		if ( json.specularMap !== undefined && textures[json.specularMap]  !== undefined )  material.specularMap = textures[json.specularMap] ;
+		if ( json.alphaMap !== undefined && textures[json.alphaMap] !== undefined )  material.alphaMap = textures[json.alphaMap] ;
 
 		if ( json.bumpScale ) {
 
@@ -173,9 +217,7 @@ THREE.MaterialLoader.prototype = {
 
 		}
 
-
-		return material;
-
+	return material;
 	}
 
 };
